@@ -1,11 +1,9 @@
 package graphql.kickstart.execution.instrumentation;
 
 import graphql.execution.ExecutionId;
-import graphql.execution.instrumentation.DeferredFieldInstrumentationContext;
 import graphql.execution.instrumentation.ExecutionStrategyInstrumentationContext;
 import graphql.execution.instrumentation.InstrumentationContext;
 import graphql.execution.instrumentation.InstrumentationState;
-import graphql.execution.instrumentation.parameters.InstrumentationDeferredFieldParameters;
 import graphql.execution.instrumentation.parameters.InstrumentationExecutionStrategyParameters;
 import graphql.execution.instrumentation.parameters.InstrumentationFieldFetchParameters;
 
@@ -19,9 +17,7 @@ public interface TrackingApproach extends InstrumentationState {
    */
   InstrumentationState createState(ExecutionId executionId);
 
-  /**
-   * Dispatch dataloaders and clean up state.
-   */
+  /** Dispatch dataloaders and clean up state. */
   void dispatch();
 
   /**
@@ -32,15 +28,6 @@ public interface TrackingApproach extends InstrumentationState {
    */
   ExecutionStrategyInstrumentationContext beginExecutionStrategy(
       InstrumentationExecutionStrategyParameters parameters);
-
-  /**
-   * Handles approach specific logic for DataLoaderDispatcherInstrumentation.
-   *
-   * @param parameters parameters supplied to DataLoaderDispatcherInstrumentation
-   * @return the instrumented context
-   */
-  DeferredFieldInstrumentationContext beginDeferredField(
-      InstrumentationDeferredFieldParameters parameters);
 
   /**
    * Handles approach specific logic for DataLoaderDispatcherInstrumentation.

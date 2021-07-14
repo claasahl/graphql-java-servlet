@@ -4,13 +4,13 @@ import graphql.kickstart.execution.GraphQLInvoker;
 import graphql.kickstart.execution.GraphQLObjectMapper;
 import graphql.kickstart.execution.GraphQLQueryInvoker;
 import graphql.kickstart.execution.context.ContextSetting;
+import graphql.kickstart.servlet.cache.CachingHttpRequestInvoker;
 import graphql.kickstart.servlet.cache.GraphQLResponseCacheManager;
 import graphql.kickstart.servlet.config.DefaultGraphQLSchemaServletProvider;
 import graphql.kickstart.servlet.config.GraphQLSchemaServletProvider;
 import graphql.kickstart.servlet.context.GraphQLServletContextBuilder;
 import graphql.kickstart.servlet.core.GraphQLServletListener;
 import graphql.kickstart.servlet.core.GraphQLServletRootObjectBuilder;
-import graphql.kickstart.servlet.core.internal.GraphQLThreadFactory;
 import graphql.kickstart.servlet.input.BatchInputPreProcessor;
 import graphql.kickstart.servlet.input.GraphQLInvocationInputFactory;
 import graphql.kickstart.servlet.input.NoOpBatchInputPreProcessor;
@@ -18,7 +18,9 @@ import graphql.schema.GraphQLSchema;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import lombok.Getter;
 
@@ -26,33 +28,33 @@ public class GraphQLConfiguration {
 
   private final GraphQLInvocationInputFactory invocationInputFactory;
   private final Supplier<BatchInputPreProcessor> batchInputPreProcessor;
-  private final GraphQLQueryInvoker queryInvoker;
   private final GraphQLInvoker graphQLInvoker;
   private final GraphQLObjectMapper objectMapper;
   private final List<GraphQLServletListener> listeners;
-  private final boolean asyncServletModeEnabled;
-  private final Executor asyncExecutor;
   private final long subscriptionTimeout;
-  @Getter
-  private final long asyncTimeout;
+  @Getter private final long asyncTimeout;
   private final ContextSetting contextSetting;
   private final GraphQLResponseCacheManager responseCacheManager;
+  @Getter private final Executor asyncExecutor;
+  private HttpRequestHandler requestHandler;
 
-  private GraphQLConfiguration(GraphQLInvocationInputFactory invocationInputFactory,
+  private GraphQLConfiguration(
+      GraphQLInvocationInputFactory invocationInputFactory,
+      GraphQLInvoker graphQLInvoker,
       GraphQLQueryInvoker queryInvoker,
-      GraphQLObjectMapper objectMapper, List<GraphQLServletListener> listeners,
-      boolean asyncServletModeEnabled,
-      Executor asyncExecutor, long subscriptionTimeout, long asyncTimeout,
+      GraphQLObjectMapper objectMapper,
+      List<GraphQLServletListener> listeners,
+      long subscriptionTimeout,
+      long asyncTimeout,
       ContextSetting contextSetting,
       Supplier<BatchInputPreProcessor> batchInputPreProcessor,
-      GraphQLResponseCacheManager responseCacheManager) {
+      GraphQLResponseCacheManager responseCacheManager,
+      Executor asyncExecutor) {
     this.invocationInputFactory = invocationInputFactory;
-    this.queryInvoker = queryInvoker;
-    this.graphQLInvoker = queryInvoker.toGraphQLInvoker();
+    this.asyncExecutor = asyncExecutor;
+    this.graphQLInvoker = graphQLInvoker != null ? graphQLInvoker : queryInvoker.toGraphQLInvoker();
     this.objectMapper = objectMapper;
     this.listeners = listeners;
-    this.asyncServletModeEnabled = asyncServletModeEnabled;
-    this.asyncExecutor = asyncExecutor;
     this.subscriptionTimeout = subscriptionTimeout;
     this.asyncTimeout = asyncTimeout;
     this.contextSetting = contextSetting;
@@ -77,10 +79,6 @@ public class GraphQLConfiguration {
     return invocationInputFactory;
   }
 
-  public GraphQLQueryInvoker getQueryInvoker() {
-    return queryInvoker;
-  }
-
   public GraphQLInvoker getGraphQLInvoker() {
     return graphQLInvoker;
   }
@@ -91,14 +89,6 @@ public class GraphQLConfiguration {
 
   public List<GraphQLServletListener> getListeners() {
     return new ArrayList<>(listeners);
-  }
-
-  public boolean isAsyncServletModeEnabled() {
-    return asyncServletModeEnabled;
-  }
-
-  public Executor getAsyncExecutor() {
-    return asyncExecutor;
   }
 
   public void add(GraphQLServletListener listener) {
@@ -125,20 +115,39 @@ public class GraphQLConfiguration {
     return responseCacheManager;
   }
 
+  public HttpRequestHandler getHttpRequestHandler() {
+    if (requestHandler == null) {
+      requestHandler = createHttpRequestHandler();
+    }
+    return requestHandler;
+  }
+
+  private HttpRequestHandler createHttpRequestHandler() {
+    if (responseCacheManager == null) {
+      return new HttpRequestHandlerImpl(this);
+    } else {
+      return new HttpRequestHandlerImpl(this, new CachingHttpRequestInvoker(this));
+    }
+  }
+
   public static class Builder {
 
     private GraphQLInvocationInputFactory.Builder invocationInputFactoryBuilder;
     private GraphQLInvocationInputFactory invocationInputFactory;
+    private GraphQLInvoker graphQLInvoker;
     private GraphQLQueryInvoker queryInvoker = GraphQLQueryInvoker.newBuilder().build();
     private GraphQLObjectMapper objectMapper = GraphQLObjectMapper.newBuilder().build();
     private List<GraphQLServletListener> listeners = new ArrayList<>();
-    private boolean asyncServletModeEnabled = false;
-    private Executor asyncExecutor = Executors.newCachedThreadPool(new GraphQLThreadFactory());
     private long subscriptionTimeout = 0;
-    private long asyncTimeout = 30;
+    private long asyncTimeout = 30000;
     private ContextSetting contextSetting = ContextSetting.PER_QUERY_WITH_INSTRUMENTATION;
-    private Supplier<BatchInputPreProcessor> batchInputPreProcessorSupplier = NoOpBatchInputPreProcessor::new;
+    private Supplier<BatchInputPreProcessor> batchInputPreProcessorSupplier =
+        NoOpBatchInputPreProcessor::new;
     private GraphQLResponseCacheManager responseCacheManager;
+    private int asyncCorePoolSize = 10;
+    private int asyncMaxPoolSize = 200;
+    private Executor asyncExecutor;
+    private AsyncTaskDecorator asyncTaskDecorator;
 
     private Builder(GraphQLInvocationInputFactory.Builder invocationInputFactoryBuilder) {
       this.invocationInputFactoryBuilder = invocationInputFactoryBuilder;
@@ -146,6 +155,11 @@ public class GraphQLConfiguration {
 
     private Builder(GraphQLInvocationInputFactory invocationInputFactory) {
       this.invocationInputFactory = invocationInputFactory;
+    }
+
+    public Builder with(GraphQLInvoker graphQLInvoker) {
+      this.graphQLInvoker = graphQLInvoker;
+      return this;
     }
 
     public Builder with(GraphQLQueryInvoker queryInvoker) {
@@ -169,18 +183,6 @@ public class GraphQLConfiguration {
       return this;
     }
 
-    public Builder with(boolean asyncServletModeEnabled) {
-      this.asyncServletModeEnabled = asyncServletModeEnabled;
-      return this;
-    }
-
-    public Builder with(Executor asyncExecutor) {
-      if (asyncExecutor != null) {
-        this.asyncExecutor = asyncExecutor;
-      }
-      return this;
-    }
-
     public Builder with(GraphQLServletContextBuilder contextBuilder) {
       this.invocationInputFactoryBuilder.withGraphQLContextBuilder(contextBuilder);
       return this;
@@ -198,6 +200,21 @@ public class GraphQLConfiguration {
 
     public Builder asyncTimeout(long asyncTimeout) {
       this.asyncTimeout = asyncTimeout;
+      return this;
+    }
+
+    public Builder with(Executor asyncExecutor) {
+      this.asyncExecutor = asyncExecutor;
+      return this;
+    }
+
+    public Builder asyncCorePoolSize(int asyncCorePoolSize) {
+      this.asyncCorePoolSize = asyncCorePoolSize;
+      return this;
+    }
+
+    public Builder asyncMaxPoolSize(int asyncMaxPoolSize) {
+      this.asyncMaxPoolSize = asyncMaxPoolSize;
       return this;
     }
 
@@ -227,23 +244,42 @@ public class GraphQLConfiguration {
       return this;
     }
 
+    public Builder with(AsyncTaskDecorator asyncTaskDecorator) {
+      this.asyncTaskDecorator = asyncTaskDecorator;
+      return this;
+    }
+
+    private Executor getAsyncExecutor() {
+      if (asyncExecutor != null) {
+        return asyncExecutor;
+      }
+      return new ThreadPoolExecutor(
+          asyncCorePoolSize,
+          asyncMaxPoolSize,
+          60,
+          TimeUnit.SECONDS,
+          new LinkedBlockingQueue<>(Integer.MAX_VALUE));
+    }
+
+    private Executor getAsyncTaskExecutor() {
+      return new AsyncTaskExecutor(getAsyncExecutor(), asyncTaskDecorator);
+    }
+
     public GraphQLConfiguration build() {
       return new GraphQLConfiguration(
-          this.invocationInputFactory != null ? this.invocationInputFactory
+          this.invocationInputFactory != null
+              ? this.invocationInputFactory
               : invocationInputFactoryBuilder.build(),
+          graphQLInvoker,
           queryInvoker,
           objectMapper,
           listeners,
-          asyncServletModeEnabled,
-          asyncExecutor,
           subscriptionTimeout,
           asyncTimeout,
           contextSetting,
           batchInputPreProcessorSupplier,
-          responseCacheManager
-      );
+          responseCacheManager,
+          getAsyncTaskExecutor());
     }
-
   }
-
 }

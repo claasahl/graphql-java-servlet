@@ -4,7 +4,7 @@ import java.util.Objects;
 
 class ConfiguredGraphQLHttpServlet extends GraphQLHttpServlet {
 
-  private GraphQLConfiguration configuration;
+  private final GraphQLConfiguration configuration;
 
   ConfiguredGraphQLHttpServlet(GraphQLConfiguration configuration) {
     this.configuration = Objects.requireNonNull(configuration, "configuration is required");
@@ -14,5 +14,4 @@ class ConfiguredGraphQLHttpServlet extends GraphQLHttpServlet {
   protected GraphQLConfiguration getConfiguration() {
     return configuration;
   }
-
 }

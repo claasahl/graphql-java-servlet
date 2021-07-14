@@ -14,10 +14,15 @@ import lombok.Getter;
 
 public class GraphQLBuilder {
 
-  private Supplier<ExecutionStrategyProvider> executionStrategyProviderSupplier = DefaultExecutionStrategyProvider::new;
-  private Supplier<PreparsedDocumentProvider> preparsedDocumentProviderSupplier = () -> NoOpPreparsedDocumentProvider.INSTANCE;
+  private Supplier<ExecutionStrategyProvider> executionStrategyProviderSupplier =
+      DefaultExecutionStrategyProvider::new;
+  private Supplier<PreparsedDocumentProvider> preparsedDocumentProviderSupplier =
+      () -> NoOpPreparsedDocumentProvider.INSTANCE;
+
   @Getter
   private Supplier<Instrumentation> instrumentationSupplier = () -> SimpleInstrumentation.INSTANCE;
+
+  private Supplier<GraphQLBuilderConfigurer> graphQLBuilderConfigurerSupplier = () -> builder -> {};
 
   public GraphQLBuilder executionStrategyProvider(Supplier<ExecutionStrategyProvider> supplier) {
     if (supplier != null) {
@@ -40,6 +45,13 @@ public class GraphQLBuilder {
     return this;
   }
 
+  public GraphQLBuilder graphQLBuilderConfigurer(Supplier<GraphQLBuilderConfigurer> supplier) {
+    if (supplier != null) {
+      graphQLBuilderConfigurerSupplier = supplier;
+    }
+    return this;
+  }
+
   public GraphQL build(GraphQLSchemaProvider schemaProvider) {
     return build(schemaProvider.getSchema());
   }
@@ -48,18 +60,19 @@ public class GraphQLBuilder {
     return build(schema, instrumentationSupplier);
   }
 
-  public GraphQL build(GraphQLSchema schema,
-      Supplier<Instrumentation> configuredInstrumentationSupplier) {
+  public GraphQL build(
+      GraphQLSchema schema, Supplier<Instrumentation> configuredInstrumentationSupplier) {
     ExecutionStrategyProvider executionStrategyProvider = executionStrategyProviderSupplier.get();
-    ExecutionStrategy queryExecutionStrategy = executionStrategyProvider
-        .getQueryExecutionStrategy();
-    ExecutionStrategy mutationExecutionStrategy = executionStrategyProvider
-        .getMutationExecutionStrategy();
-    ExecutionStrategy subscriptionExecutionStrategy = executionStrategyProvider
-        .getSubscriptionExecutionStrategy();
+    ExecutionStrategy queryExecutionStrategy =
+        executionStrategyProvider.getQueryExecutionStrategy();
+    ExecutionStrategy mutationExecutionStrategy =
+        executionStrategyProvider.getMutationExecutionStrategy();
+    ExecutionStrategy subscriptionExecutionStrategy =
+        executionStrategyProvider.getSubscriptionExecutionStrategy();
 
-    GraphQL.Builder builder = GraphQL.newGraphQL(schema)
-        .preparsedDocumentProvider(preparsedDocumentProviderSupplier.get());
+    GraphQL.Builder builder =
+        GraphQL.newGraphQL(schema)
+            .preparsedDocumentProvider(preparsedDocumentProviderSupplier.get());
 
     if (queryExecutionStrategy != null) {
       builder.queryExecutionStrategy(queryExecutionStrategy);
@@ -78,15 +91,15 @@ public class GraphQLBuilder {
     if (containsDispatchInstrumentation(instrumentation)) {
       builder.doNotAddDefaultInstrumentations();
     }
+    graphQLBuilderConfigurerSupplier.get().configure(builder);
     return builder.build();
   }
 
   private boolean containsDispatchInstrumentation(Instrumentation instrumentation) {
     if (instrumentation instanceof ChainedInstrumentation) {
-      return ((ChainedInstrumentation) instrumentation).getInstrumentations().stream()
-          .anyMatch(this::containsDispatchInstrumentation);
+      return ((ChainedInstrumentation) instrumentation)
+          .getInstrumentations().stream().anyMatch(this::containsDispatchInstrumentation);
     }
     return instrumentation instanceof DataLoaderDispatcherInstrumentation;
   }
-
 }

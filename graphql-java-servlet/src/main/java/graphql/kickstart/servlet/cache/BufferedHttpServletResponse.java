@@ -18,6 +18,7 @@ public class BufferedHttpServletResponse extends HttpServletResponseWrapper {
   private ServletOutputStream outputStream;
   private PrintWriter writer;
   private String errorMessage;
+
   public BufferedHttpServletResponse(HttpServletResponse response) {
     super(response);
   }
@@ -56,8 +57,9 @@ public class BufferedHttpServletResponse extends HttpServletResponseWrapper {
 
     if (writer == null) {
       copier = new BufferedOutputStream(getResponse().getOutputStream());
-      writer = new PrintWriter(new OutputStreamWriter(copier, getResponse().getCharacterEncoding()),
-          true);
+      writer =
+          new PrintWriter(
+              new OutputStreamWriter(copier, getResponse().getCharacterEncoding()), true);
     }
 
     return writer;
@@ -130,12 +132,11 @@ public class BufferedHttpServletResponse extends HttpServletResponseWrapper {
 
     @Override
     public void setWriteListener(WriteListener writeListener) {
+      // write listener not supported
     }
 
     public byte[] toByteArray() {
       return buf.toByteArray();
     }
-
   }
-
 }

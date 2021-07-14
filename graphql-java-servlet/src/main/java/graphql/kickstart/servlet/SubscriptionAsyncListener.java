@@ -28,6 +28,6 @@ class SubscriptionAsyncListener implements AsyncListener {
 
   @Override
   public void onStartAsync(AsyncEvent event) {
+    // default empty implementation
   }
-
 }

@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class GraphQLThreadFactory implements ThreadFactory {
 
-  final static String NAME_PREFIX = "GraphQLServlet-";
+  static final String NAME_PREFIX = "GraphQLServlet-";
   final AtomicInteger threadNumber = new AtomicInteger(1);
 
   @Override
@@ -21,5 +21,4 @@ public class GraphQLThreadFactory implements ThreadFactory {
     t.setPriority(Thread.NORM_PRIORITY);
     return t;
   }
-
 }

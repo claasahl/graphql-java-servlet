@@ -1,14 +1,14 @@
 package graphql.kickstart.execution.error;
 
+import static java.util.Collections.emptyList;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import graphql.ErrorType;
 import graphql.GraphQLError;
 import graphql.language.SourceLocation;
 import java.util.List;
 
-/**
- * @author Andrew Potter
- */
+/** @author Andrew Potter */
 public class GenericGraphQLError implements GraphQLError {
 
   private final String message;
@@ -25,7 +25,7 @@ public class GenericGraphQLError implements GraphQLError {
   @Override
   @JsonIgnore
   public List<SourceLocation> getLocations() {
-    return null;
+    return emptyList();
   }
 
   @Override

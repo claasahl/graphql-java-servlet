@@ -1,7 +1,6 @@
 package graphql.kickstart.servlet;
 
 import graphql.ExecutionResult;
-import graphql.GraphQL;
 import graphql.kickstart.execution.GraphQLObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +17,7 @@ import org.reactivestreams.Subscription;
 @RequiredArgsConstructor
 class SingleAsynchronousQueryResponseWriter implements QueryResponseWriter {
 
-  @Getter
-  private final ExecutionResult result;
+  @Getter private final ExecutionResult result;
   private final GraphQLObjectMapper graphQLObjectMapper;
   private final long subscriptionTimeout;
 
@@ -35,23 +33,19 @@ class SingleAsynchronousQueryResponseWriter implements QueryResponseWriter {
     asyncContext.setTimeout(subscriptionTimeout);
     AtomicReference<Subscription> subscriptionRef = new AtomicReference<>();
     asyncContext.addListener(new SubscriptionAsyncListener(subscriptionRef));
-    ExecutionResultSubscriber subscriber = new ExecutionResultSubscriber(subscriptionRef,
-        asyncContext,
-        graphQLObjectMapper);
+    ExecutionResultSubscriber subscriber =
+        new ExecutionResultSubscriber(subscriptionRef, asyncContext, graphQLObjectMapper);
     List<Publisher<ExecutionResult>> publishers = new ArrayList<>();
     if (result.getData() instanceof Publisher) {
       publishers.add(result.getData());
     } else {
       publishers.add(new StaticDataPublisher<>(result));
-      final Publisher<ExecutionResult> deferredResultsPublisher = (Publisher<ExecutionResult>) result
-          .getExtensions()
-          .get(GraphQL.DEFERRED_RESULTS);
-      publishers.add(deferredResultsPublisher);
     }
     publishers.forEach(it -> it.subscribe(subscriber));
 
     if (isInAsyncThread) {
-      // We need to delay the completion of async context until after the subscription has terminated, otherwise the AsyncContext is prematurely closed.
+      // We need to delay the completion of async context until after the subscription has
+      // terminated, otherwise the AsyncContext is prematurely closed.
       try {
         subscriber.await();
       } catch (InterruptedException e) {
@@ -59,5 +53,4 @@ class SingleAsynchronousQueryResponseWriter implements QueryResponseWriter {
       }
     }
   }
-
 }

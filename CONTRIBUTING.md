@@ -1,8 +1,7 @@
 # How to contribute
 
 We're really glad you're reading this, because we need more volunteer developers
-to help with this project! If you haven't already, connect with us on 
-[Spectrum](https://spectrum.chat/graphql-java-kick?tab=posts).
+to help with this project!
 
 We can use all the help we can get on all our [GraphQL Java Kickstart](https://github.com/graphql-java-kickstart)
 projects. This work ranges from adding new features, fixing bugs, and answering questions to writing documentation. 
@@ -32,6 +31,12 @@ We use Google Style guides for our projects. See the
 description. You can download the 
 [IntelliJ Java Google Style](https://github.com/google/styleguide/blob/gh-pages/intellij-java-google-style.xml)
 to import in these settings in IntelliJ.
+
+These conventions are checked during the build phase. If the build fails because
+the code is not using the correct style you can fix this easily by running a gradle task
+```bash
+./gradlew googleJavaFormat
+```
 
 ### SonarLint
 

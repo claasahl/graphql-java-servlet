@@ -1,12 +1,15 @@
 # GraphQL Java Servlet
+[![Maven Central](https://img.shields.io/maven-central/v/com.graphql-java-kickstart/graphql-java-servlet.svg)](https://maven-badges.herokuapp.com/maven-central/com.graphql-java-kickstart/graphql-java-servlet)
 [![Build Status](https://github.com/graphql-java-kickstart/graphql-java-servlet/workflows/Publish%20snapshot/badge.svg)](https://github.com/graphql-java-kickstart/graphql-java-servlet/actions?query=workflow%3A%22Publish+snapshot%22)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.graphql-java-kickstart/graphql-java-servlet/badge.svg?service=github)](https://maven-badges.herokuapp.com/maven-central/com.graphql-java-kickstart/graphql-java-servlet)
-[![Chat on Spectrum](https://img.shields.io/badge/spectrum-join%20the%20community-%23800080)](https://spectrum.chat/graphql-java-kick)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=graphql-java-kickstart_graphql-java-servlet&metric=alert_status)](https://sonarcloud.io/dashboard?id=graphql-java-kickstart_graphql-java-servlet)
+[![GitHub contributors](https://img.shields.io/github/contributors/graphql-java-kickstart/graphql-java-servlet)](https://github.com/graphql-java-kickstart/graphql-java-servlet/graphs/contributors)
+[![Discuss on GitHub](https://img.shields.io/badge/GitHub-discuss-orange)](https://github.com/graphql-java-kickstart/graphql-java-servlet/discussions)
+
 
 ## We are looking for contributors!
 Are you interested in improving our documentation, working on the codebase, reviewing PRs?
 
-[Reach out to us on Spectrum](https://spectrum.chat/graphql-java-kick) and join the team!
+[Reach out to us on Discussions](https://github.com/graphql-java-kickstart/graphql-java-servlet/discussions) and join the team!
 
 We hope you'll get involved! Read our [Contributors' Guide](CONTRIBUTING.md) for more details.
 
@@ -17,7 +20,7 @@ See [GraphQL Java documentation](https://www.graphql-java.com/documentation/late
 regarding GraphQL Java itself. 
 
 We try to stay up to date with GraphQL Java as much as possible. The current version supports
- **GraphQL Java 15.0**.
+ **GraphQL Java 16.1**.
  
 This project requires at least Java 8.
 
