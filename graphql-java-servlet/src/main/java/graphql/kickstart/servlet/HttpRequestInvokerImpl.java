@@ -1,7 +1,11 @@
 package graphql.kickstart.servlet;
 
+import static graphql.kickstart.servlet.HttpRequestHandler.STATUS_BAD_REQUEST;
+import static graphql.kickstart.servlet.HttpRequestHandler.STATUS_INTERNAL_SERVER_ERROR;
+
 import graphql.ExecutionResult;
 import graphql.ExecutionResultImpl;
+import graphql.GraphQLException;
 import graphql.kickstart.execution.FutureExecutionResult;
 import graphql.kickstart.execution.GraphQLInvoker;
 import graphql.kickstart.execution.GraphQLQueryResult;
@@ -16,10 +20,11 @@ import java.io.UncheckedIOException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.servlet.AsyncContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -35,13 +40,12 @@ public class HttpRequestInvokerImpl implements HttpRequestInvoker {
   public void execute(
       GraphQLInvocationInput invocationInput,
       HttpServletRequest request,
-      HttpServletResponse response) {
-    ListenerHandler listenerHandler =
-        ListenerHandler.start(request, response, configuration.getListeners());
+      HttpServletResponse response,
+      ListenerHandler listenerHandler) {
     if (request.isAsyncSupported()) {
       invokeAndHandleAsync(invocationInput, request, response, listenerHandler);
     } else {
-      handle(invoke(invocationInput, request, response), request, response, listenerHandler).join();
+      handle(invocationInput, request, response, listenerHandler);
     }
   }
 
@@ -76,14 +80,49 @@ public class HttpRequestInvokerImpl implements HttpRequestInvoker {
         .getAsyncExecutor()
         .execute(
             () -> {
-              FutureExecutionResult futureResult = invoke(invocationInput, request, response);
-              futureHolder.set(futureResult);
-              handle(futureResult, request, response, listenerHandler)
-                  .thenAccept(it -> asyncContext.complete());
+              try {
+                FutureExecutionResult futureResult = invoke(invocationInput, request, response);
+                futureHolder.set(futureResult);
+                handleInternal(futureResult, request, response, listenerHandler)
+                    .thenAccept(it -> asyncContext.complete());
+              } catch (GraphQLException e) {
+                response.setStatus(STATUS_BAD_REQUEST);
+                log.info("Bad request: cannot handle http request", e);
+                listenerHandler.onError(e);
+                asyncContext.complete();
+              } catch (Exception e) {
+                response.setStatus(STATUS_INTERNAL_SERVER_ERROR);
+                log.error("Cannot handle http request", e);
+                listenerHandler.onError(e);
+                asyncContext.complete();
+              }
             });
   }
 
-  private CompletableFuture<Void> handle(
+  private void handle(
+      GraphQLInvocationInput invocationInput,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      ListenerHandler listenerHandler) {
+    try {
+      FutureExecutionResult futureResult = invoke(invocationInput, request, response);
+      handleInternal(futureResult, request, response, listenerHandler)
+          .get(configuration.getAsyncTimeout(), TimeUnit.MILLISECONDS);
+    } catch (GraphQLException e) {
+      response.setStatus(STATUS_BAD_REQUEST);
+      log.info("Bad request: cannot handle http request", e);
+      listenerHandler.onError(e);
+    } catch (Exception e) {
+      response.setStatus(STATUS_INTERNAL_SERVER_ERROR);
+      log.error("Cannot handle http request", e);
+      listenerHandler.onError(e);
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private CompletableFuture<Void> handleInternal(
       FutureExecutionResult futureResult,
       HttpServletRequest request,
       HttpServletResponse response,

@@ -27,10 +27,10 @@ buildscript {
 }
 
 plugins {
-    id "biz.aQute.bnd.builder" version "5.3.0" apply false
-    id "org.sonarqube" version "3.3"
+    id "biz.aQute.bnd.builder" version "6.4.0" apply false
+    id "org.sonarqube" version "5.1.0.4882"
     id "jacoco"
-    id 'io.codearte.nexus-staging' version '0.30.0'
+    id "io.github.gradle-nexus.publish-plugin" version '2.0.0'
 }
 
 sonarqube {
@@ -76,6 +76,11 @@ subprojects {
         targetCompatibility = TARGET_COMPATIBILITY
     }
 
+    compileTestJava {
+        sourceCompatibility = SOURCE_COMPATIBILITY_TEST
+        targetCompatibility = TARGET_COMPATIBILITY_TEST
+    }
+
     compileJava.dependsOn(processResources)
 
     test {
@@ -92,9 +97,9 @@ subprojects {
 
     jacocoTestReport {
         reports {
-            xml.enabled = true
-            html.enabled = false
-            csv.enabled = false
+            xml.required = true
+            html.required = false
+            csv.required = false
         }
     }
 
@@ -172,27 +177,17 @@ subprojects {
                     }
                 }
             }
-            repositories {
-                maven {
-                    name 'ossrh'
-                    if (version.toString().endsWith("-SNAPSHOT")) {
-                        url "https://oss.sonatype.org/content/repositories/snapshots/"
-                    } else {
-                        url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-                    }
-                    credentials {
-                        username = System.env.OSS_USER_TOKEN_KEY ?: project.findProperty('OSS_USER_TOKEN_KEY') ?: ''
-                        password = System.env.OSS_USER_TOKEN_PASS ?: project.findProperty('OSS_USER_TOKEN_PASS') ?: ''
-                    }
-                }
-            }
         }
     }
 }
 
-nexusStaging {
-    username = System.env.OSS_USER_TOKEN_KEY ?: project.findProperty('OSS_USER_TOKEN_KEY') ?: ''
-    password = System.env.OSS_USER_TOKEN_PASS ?: project.findProperty('OSS_USER_TOKEN_PASS') ?: ''
+nexusPublishing {
+    repositories {
+        sonatype {
+            username = System.env.OSS_USER_TOKEN_KEY ?: project.findProperty('OSS_USER_TOKEN_KEY') ?: ''
+            password = System.env.OSS_USER_TOKEN_PASS ?: project.findProperty('OSS_USER_TOKEN_PASS') ?: ''
+        }
+    }
 }
 
 wrapper {

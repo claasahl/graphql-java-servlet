@@ -422,6 +422,25 @@ class AbstractGraphQLHttpServletSpec extends Specification {
     getResponseContent().data.echo == "test"
   }
 
+  def "query over HTTP POST multiline body returns data"() {
+    setup:
+    request.setContent("""
+        query { object {
+a
+b
+        } }""".bytes)
+    request.setMethod("POST")
+    request.contentType = "application/graphql"
+
+    when:
+    servlet.doPost(request, response)
+
+    then:
+    response.getStatus() == STATUS_OK
+    response.getContentType() == CONTENT_TYPE_JSON_UTF8
+    getResponseContent().data.object.b == null
+  }
+
   def "disabling async support on request over HTTP POST does not start async request"() {
     setup:
     servlet = TestUtils.createDefaultServlet({ env -> env.arguments.arg }, { env -> env.arguments.arg }, { env ->
@@ -734,6 +753,22 @@ class AbstractGraphQLHttpServletSpec extends Specification {
     response.getStatus() == STATUS_OK
     response.getContentType() == CONTENT_TYPE_JSON_UTF8
     getResponseContent().data.echoFiles == ["test", "test again"]
+  }
+
+  def "errors while accessing file from the request"() {
+    setup:
+    request = Spy(MockHttpServletRequest)
+    request.setMethod("POST")
+    request.setContentType("multipart/form-data, boundary=test")
+    // See https://github.com/apache/tomcat/blob/main/java/org/apache/catalina/connector/Request.java#L2775...L2791
+    request.getParts() >> { throw new IllegalStateException() }
+
+    when:
+    servlet.doPost(request, response)
+
+    then:
+    response.getStatus() == STATUS_BAD_REQUEST
+    response.getContentLength() == 0
   }
 
   def "batched query over HTTP POST body returns data"() {
@@ -1085,7 +1120,7 @@ class AbstractGraphQLHttpServletSpec extends Specification {
       throw new TestException()
     }.build()).build()
     servlet = GraphQLHttpServlet.with(configuration)
-    servlet.init(null)
+    servlet.init()
 
     request.setPathInfo('/schema.json')
 
@@ -1093,8 +1128,7 @@ class AbstractGraphQLHttpServletSpec extends Specification {
     servlet.doGet(request, response)
 
     then:
-    noExceptionThrown()
-    response.getStatus() == STATUS_ERROR
+    response.getStatus() == STATUS_BAD_REQUEST
   }
 
   def "errors while data fetching are masked in the response"() {

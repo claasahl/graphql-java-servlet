@@ -9,14 +9,14 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor
-class ListenerHandler {
+public class ListenerHandler {
 
   private final List<RequestCallback> callbacks;
   private final HttpServletRequest request;
@@ -58,6 +58,10 @@ class ListenerHandler {
             log.error("Error running callback: {}", callback, t);
           }
         });
+  }
+
+  void onParseError(Throwable throwable) {
+    runCallbacks(it -> it.onParseError(request, response, throwable));
   }
 
   void beforeFlush() {

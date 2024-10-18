@@ -29,14 +29,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-import javax.websocket.CloseReason;
-import javax.websocket.Endpoint;
-import javax.websocket.EndpointConfig;
-import javax.websocket.HandshakeResponse;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
-import javax.websocket.server.HandshakeRequest;
-import javax.websocket.server.ServerEndpointConfig;
+import jakarta.websocket.CloseReason;
+import jakarta.websocket.Endpoint;
+import jakarta.websocket.EndpointConfig;
+import jakarta.websocket.HandshakeResponse;
+import jakarta.websocket.MessageHandler;
+import jakarta.websocket.Session;
+import jakarta.websocket.server.HandshakeRequest;
+import jakarta.websocket.server.ServerEndpointConfig;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -108,6 +108,21 @@ public class GraphQLWebsocketServlet extends Endpoint {
             new GraphQLSubscriptionMapper(graphQLObjectMapper),
             invocationInputFactory,
             graphQLInvoker);
+    allSubscriptionProtocols =
+        Stream.concat(
+                subscriptionProtocolFactories.stream(),
+                Stream.of(fallbackSubscriptionProtocolFactory))
+            .map(SubscriptionProtocolFactory::getProtocol)
+            .collect(toList());
+  }
+
+  public GraphQLWebsocketServlet(
+      List<SubscriptionProtocolFactory> subscriptionProtocolFactory,
+      SubscriptionProtocolFactory fallbackSubscriptionProtocolFactory) {
+
+    this.subscriptionProtocolFactories = subscriptionProtocolFactory;
+    this.fallbackSubscriptionProtocolFactory = fallbackSubscriptionProtocolFactory;
+
     allSubscriptionProtocols =
         Stream.concat(
                 subscriptionProtocolFactories.stream(),
@@ -234,6 +249,12 @@ public class GraphQLWebsocketServlet extends Endpoint {
         log.error("GraphQLWebsocketServlet did not shut down cleanly!");
         sessionSubscriptionCache.clear();
       }
+
+      for (SubscriptionProtocolFactory protocolFactory : subscriptionProtocolFactories) {
+        protocolFactory.shutdown();
+      }
+
+      fallbackSubscriptionProtocolFactory.shutdown();
     }
 
     isShutDown.set(true);

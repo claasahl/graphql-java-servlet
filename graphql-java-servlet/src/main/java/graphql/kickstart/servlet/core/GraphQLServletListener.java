@@ -1,7 +1,7 @@
 package graphql.kickstart.servlet.core;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /** @author Andrew Potter */
 public interface GraphQLServletListener {
@@ -20,6 +20,14 @@ public interface GraphQLServletListener {
    * The callback which used to add additional listeners for GraphQL request execution.
    */
   interface RequestCallback {
+
+    /**
+     * Called when failed to parse InvocationInput and the response was not written.
+     * @param request http request
+     * @param response http response
+     */
+    default void onParseError(
+        HttpServletRequest request, HttpServletResponse response, Throwable throwable) {}
 
     /**
      * Called right before the response will be written and flushed. Can be used for applying some

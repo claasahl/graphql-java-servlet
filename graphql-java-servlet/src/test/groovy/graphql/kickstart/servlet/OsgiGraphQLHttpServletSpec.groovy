@@ -4,19 +4,18 @@ import graphql.AssertException
 import graphql.annotations.annotationTypes.GraphQLField
 import graphql.annotations.annotationTypes.GraphQLName
 import graphql.annotations.processor.GraphQLAnnotations
-import graphql.execution.instrumentation.Instrumentation
 import graphql.execution.instrumentation.InstrumentationState
-import graphql.execution.instrumentation.SimpleInstrumentation
+import graphql.execution.instrumentation.SimplePerformantInstrumentation
 import graphql.execution.instrumentation.parameters.InstrumentationCreateStateParameters
+import graphql.introspection.Introspection
 import graphql.kickstart.execution.GraphQLRequest
 import graphql.kickstart.execution.config.ExecutionStrategyProvider
 import graphql.kickstart.execution.config.InstrumentationProvider
 import graphql.kickstart.execution.context.DefaultGraphQLContext
-import graphql.kickstart.execution.context.GraphQLContext
+import graphql.kickstart.execution.context.GraphQLKickstartContext
 import graphql.kickstart.servlet.context.GraphQLServletContextBuilder
 import graphql.kickstart.servlet.core.GraphQLServletListener
 import graphql.kickstart.servlet.core.GraphQLServletRootObjectBuilder
-import graphql.kickstart.servlet.input.NoOpBatchInputPreProcessor
 import graphql.kickstart.servlet.osgi.*
 import graphql.schema.*
 import org.dataloader.DataLoaderRegistry
@@ -267,6 +266,43 @@ class OsgiGraphQLHttpServletSpec extends Specification {
     null == servlet.configuration.invocationInputFactory.schemaProvider.schema.getType("Upload")
   }
 
+  static class TestDirectiveProvider implements GraphQLDirectiveProvider {
+    @Override
+    Set<GraphQLDirective> getDirectives() {
+      return new HashSet<>(Arrays.asList(GraphQLDirective.newDirective().name("myDirective").validLocation(Introspection.DirectiveLocation.FIELD).build()));
+    }
+  }
+
+  def "directive provider adds directives"() {
+    setup:
+    OsgiGraphQLHttpServlet servlet = new OsgiGraphQLHttpServlet()
+    TestDirectiveProvider directiveProvider = new TestDirectiveProvider()
+
+    when:
+    servlet.bindDirectivesProvider(directiveProvider)
+
+    then:
+    def directive = servlet.configuration.invocationInputFactory.schemaProvider.schema.getDirective("myDirective")
+    directive != null
+    directive.name == "myDirective"
+
+    when:
+    servlet.unbindDirectivesProvider(directiveProvider)
+
+    then:
+    null == servlet.configuration.invocationInputFactory.schemaProvider.schema.getDirective("myDirective")
+
+    when:
+    servlet.bindProvider(directiveProvider)
+    then:
+    servlet.configuration.invocationInputFactory.schemaProvider.schema.getDirective("myDirective").name == "myDirective"
+
+    when:
+    servlet.unbindProvider(directiveProvider)
+    then:
+    null == servlet.configuration.invocationInputFactory.schemaProvider.schema.getType("myDirective")
+  }
+
   def "servlet listener is bound and unbound"() {
     setup:
     def servlet = new OsgiGraphQLHttpServlet()
@@ -286,9 +322,9 @@ class OsgiGraphQLHttpServletSpec extends Specification {
   def "context builder is bound and unbound"() {
     setup:
     def servlet = new OsgiGraphQLHttpServlet()
-    def context = Mock(GraphQLContext)
+    def context = Mock(GraphQLKickstartContext)
     context.getDataLoaderRegistry() >> new DataLoaderRegistry()
-    context.getSubject() >> Optional.empty()
+    context.getMapOfContext() >> new HashMap<Object, Object>()
     def contextBuilder = Mock(GraphQLServletContextBuilder)
     contextBuilder.build() >> context
     def request = GraphQLRequest.createIntrospectionRequest()
@@ -351,7 +387,7 @@ class OsgiGraphQLHttpServletSpec extends Specification {
   def "instrumentation provider is bound and unbound"() {
     setup:
     def servlet = new OsgiGraphQLHttpServlet()
-    def instrumentation = new SimpleInstrumentation()
+    def instrumentation = new SimplePerformantInstrumentation()
     def instrumentationProvider = Mock(InstrumentationProvider)
     instrumentationProvider.getInstrumentation() >> instrumentation
     def request = GraphQLRequest.createIntrospectionRequest()
